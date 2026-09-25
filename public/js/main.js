@@ -105,7 +105,10 @@ async function powerOn() {
   await ctx.audioWorklet.addModule("js/modem-worklet.js");
   node = new AudioWorkletNode(ctx, "modem-processor", { numberOfInputs: 0, outputChannelCount: [2] });
   gain = ctx.createGain();
-  node.connect(gain).connect(ctx.destination);
+  // 電話回線の帯域 (300Hz〜3.4kHz) に絞って、耳に刺さる成分を落とす
+  const hp = new BiquadFilterNode(ctx, { type: "highpass", frequency: 300, Q: 0.5 });
+  const lp = new BiquadFilterNode(ctx, { type: "lowpass", frequency: 3400, Q: 0.5 });
+  node.connect(hp).connect(lp).connect(gain).connect(ctx.destination);
   const split = ctx.createChannelSplitter(2);
   node.connect(split);
   for (const [i, ch] of [[0, "L"], [1, "R"]]) {
@@ -125,6 +128,8 @@ async function powerOn() {
 
 const post = (m) => node && node.port.postMessage(m);
 const tone = (ch, opts) => post({ type: "tone", ch, ...opts });
+/** 受話器の「ガチャ」 */
+const clunk = () => post({ type: "clunk" });
 const silence = (ch) => post({ type: "silence", ch });
 
 /** トーンを鳴らして終わるまで待つ */
@@ -177,7 +182,7 @@ function blink(name) {
 
 function updateVolume() {
   if (!gain) return;
-  const vol = [0.15, 0.35, 0.6, 1.0][modem.volume] * Number($("volume").value) / 100;
+  const vol = [0.08, 0.16, 0.28, 0.45][modem.volume] * Number($("volume").value) / 100;
   const audible = modem.speaker === 2 || (modem.speaker === 1 && modem.state === "dialing");
   gain.gain.setTargetAtTime(audible ? vol : 0, ctx.currentTime, 0.05);
 }
@@ -261,16 +266,18 @@ async function dial(number) {
   modem.txQueue = [];
   setState("dialing");
   led("OH", true);
+  clunk(); // 受話器を上げる
   const check = () => {
     if (abort.signal.aborted) throw new Error("abort");
   };
   try {
+    await sleep(450);
     // ダイヤルトーン (400Hz) を聞いてからダイヤル
-    await playTone("R", { freqs: [400], dur: 1200 });
+    await playTone("R", { freqs: [400], level: 0.12, dur: 1200 });
     check();
     for (const d of number.toUpperCase()) {
       if (DTMF[d]) {
-        await playTone("L", { freqs: DTMF[d], level: 0.25, dur: 90 });
+        await playTone("L", { freqs: DTMF[d], level: 0.14, dur: 90 });
         await sleep(70);
       } else if (d === ",") {
         await sleep(2000);
@@ -278,12 +285,12 @@ async function dial(number) {
       check();
     }
     if (!dest) {
-      await playTone("R", { freqs: [400], am: 16, on: 1000, off: 2000, dur: 9000 });
+      await playTone("R", { freqs: [400], am: 16, on: 1000, off: 2000, level: 0.1, dur: 9000 });
       throw new Error("NO ANSWER");
     }
     $("dest").textContent = dest.name;
     // 呼び出し音 (400Hz を 16Hz で揺らす、1 秒鳴って 2 秒休む) を鳴らしながら接続
-    tone("R", { freqs: [400], am: 16, on: 1000, off: 2000, level: 0.15 });
+    tone("R", { freqs: [400], am: 16, on: 1000, off: 2000, level: 0.1 });
     const started = performance.now();
     let ws;
     try {
@@ -291,7 +298,7 @@ async function dial(number) {
     } catch (e) {
       if (abort.signal.aborted) throw e;
       // 話し中の音 (400Hz、0.5 秒ずつ断続)
-      await playTone("R", { freqs: [400], on: 500, off: 500, dur: 3000 });
+      await playTone("R", { freqs: [400], on: 500, off: 500, level: 0.1, dur: 3000 });
       throw new Error("BUSY");
     }
     modem.ws = ws;
@@ -313,7 +320,7 @@ async function dial(number) {
     // 応答音 (2100Hz)
     silence("R");
     await sleep(300);
-    await playTone("R", { freqs: [2100], level: 0.2, dur: 2600 });
+    await playTone("R", { freqs: [2100], level: 0.1, dur: 2600 });
     check();
     // ハンドシェイク: 応答側 (2400Hz) のキャリア → 発信側 (1200Hz) のキャリア
     await sleep(75);
@@ -340,10 +347,32 @@ function receive(bytes) {
   post({ type: "push", ch: "R", bytes });
 }
 
-function carrierLost() {
-  if (modem.state === "command") return;
-  hangup(false);
-  say("\nNO CARRIER\n");
+/** 回線が乱れて化けた文字 (NO CARRIER の前の演出) */
+const GARBAGE = "~}{|`_^][\\@?>=<;:/.-,+*)('&%$#!ｱｲｳｴｵｶｷｸｹｺﾟﾞ｡｢｣､･ｦｧｨﾇﾈﾉ▒░¥";
+async function garble() {
+  tone("R", { noise: true, level: 0.06, dur: 700 });
+  const n = 18 + Math.floor(Math.random() * 20);
+  for (let i = 0; i < n; i++) {
+    let s = "";
+    for (let k = 0; k < 1 + Math.floor(Math.random() * 3); k++) s += GARBAGE[Math.floor(Math.random() * GARBAGE.length)];
+    term.write(s);
+    blink("RD");
+    await sleep(8 + Math.random() * 30);
+  }
+}
+
+let losing = false;
+async function carrierLost() {
+  if (modem.state === "command" || losing) return;
+  losing = true;
+  try {
+    silence("L");
+    if (modem.state === "online") await garble();
+    hangup(false);
+    say("\nNO CARRIER\n");
+  } finally {
+    losing = false;
+  }
 }
 
 /** 回線を切る。`ok` なら OK を返す (ATH のとき) */
@@ -357,6 +386,7 @@ function hangup(ok) {
   }
   silence("L");
   silence("R");
+  if (modem.state !== "command") clunk(); // 受話器を置く
   for (const l of ["OH", "CD", "HS", "RD", "SD"]) led(l, false);
   $("dest").textContent = "-";
   setState("command");
@@ -594,7 +624,8 @@ $("dial").onclick = async () => {
   term.focus();
 };
 $("hangup").onclick = () => {
-  if (modem.state !== "command") {
+  if (modem.state === "online") carrierLost();
+  else if (modem.state !== "command") {
     hangup(false);
     say("\nNO CARRIER\n");
   }
