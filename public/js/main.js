@@ -201,7 +201,7 @@ function setState(s) {
   $("status").textContent = {
     command: "コマンドモード",
     dialing: "発信中",
-    online: "オンライン 1200bps",
+    online: `オンライン ${SPEEDS[modem.speed].label.replace(/ \(.*\)$/, "")}`,
     escaped: "オンライン (コマンドモード)",
   }[s];
   updateVolume();
