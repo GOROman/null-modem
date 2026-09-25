@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NULL-MODEM 1200</title>
+  <meta name="description" content="ブラウザで動く 1200bps (V.22) ソフトウェアモデム。音を鳴らしながらパソコン通信の BBS につなぎます">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
+</head>
+<body>
+  <main>
+    <section class="modem" aria-label="モデム本体">
+      <div class="brand">
+        <span class="logo">NULL-MODEM</span>
+        <span class="model">1200 / V.22</span>
+      </div>
+      <div class="leds" aria-label="状態ランプ">
+        <div class="led" data-led="HS"><i></i><span>HS</span></div>
+        <div class="led" data-led="CD"><i></i><span>CD</span></div>
+        <div class="led" data-led="OH"><i></i><span>OH</span></div>
+        <div class="led" data-led="RD"><i></i><span>RD</span></div>
+        <div class="led" data-led="SD"><i></i><span>SD</span></div>
+        <div class="led" data-led="TR"><i></i><span>TR</span></div>
+        <div class="led" data-led="MR"><i></i><span>MR</span></div>
+      </div>
+      <button id="power" class="power" title="電源">POWER</button>
+    </section>
+
+    <section class="controls" aria-label="操作">
+      <label>電話帳
+        <select id="phonebook"></select>
+      </label>
+      <label id="custom-row" hidden>接続先
+        <input id="custom-url" type="url" placeholder="wss://bbs.example.com/" size="32">
+      </label>
+      <button id="dial">ダイヤル</button>
+      <button id="hangup">切断</button>
+      <label>音量
+        <input id="volume" type="range" min="0" max="100" value="70">
+      </label>
+      <span class="status"><b id="status">コマンドモード</b> / 接続先: <b id="dest">-</b></span>
+    </section>
+
+    <div id="terminal"></div>
+
+    <section class="scopes" aria-label="波形">
+      <figure>
+        <canvas id="scope-L" width="480" height="90"></canvas>
+        <figcaption>送信 (L) 発信側キャリア 1200Hz</figcaption>
+      </figure>
+      <figure>
+        <canvas id="scope-R" width="480" height="90"></canvas>
+        <figcaption>受信 (R) 応答側キャリア 2400Hz</figcaption>
+      </figure>
+    </section>
+
+    <details class="help">
+      <summary>使い方</summary>
+      <p>POWER を押して (または端末で何かキーを押して) 電源を入れ、<code>ATDT0</code> と打つか「ダイヤル」を押すと BBS に電話をかけます。
+        ダイヤルトーン、ダイヤル音、呼び出し音、応答音、ハンドシェイクの後に <code>CONNECT 1200</code> と出たら接続です。</p>
+      <p>送るデータと受け取るデータは、実際に V.22 方式で変調した音として鳴ります。左が送信、右が受信です (ヘッドホンだと分かりやすいです)。
+        データはその音の速さ (1200bps、1 秒に約 120 文字) で届きます。</p>
+      <table>
+        <tr><th>コマンド</th><th>動作</th></tr>
+        <tr><td><code>ATDT番号</code></td><td>電話をかける (番号は電話帳で接続先に対応)</td></tr>
+        <tr><td><code>+++</code></td><td>接続したままコマンドモードへ (前後に 1 秒何も打たない)</td></tr>
+        <tr><td><code>ATH</code></td><td>電話を切る</td></tr>
+        <tr><td><code>ATO</code></td><td>オンラインに戻る</td></tr>
+        <tr><td><code>ATM0/1/2</code></td><td>スピーカー: 消音 / 接続まで / 常に</td></tr>
+        <tr><td><code>ATL0〜3</code></td><td>スピーカーの音量</td></tr>
+        <tr><td><code>ATI</code></td><td>モデムの情報</td></tr>
+        <tr><td><code>A/</code></td><td>直前のコマンドをもう一度</td></tr>
+      </table>
+    </details>
+  </main>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

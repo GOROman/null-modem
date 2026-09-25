@@ -1,0 +1,12 @@
+{
+  "name": "null-modem",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/v22.test.mjs",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  }
+}

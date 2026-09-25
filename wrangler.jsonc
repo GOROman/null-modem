@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "null-modem",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-07-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+  "vars": {
+    // 電話帳: 番号 → 接続先 (Cloudflare Tunnel で公開した null-bbs の WebSocket)
+    "PHONEBOOK": "[{\"number\":\"0\",\"name\":\"NULL-BBS\",\"url\":\"wss://bbs.example.com/\"}]"
+  }
+}
