@@ -95,3 +95,97 @@ test("エネルギーがキャリア周波数の近くに集まっている", ()
   };
   assert.ok(power(2400) > 20 * power(1200), "2400Hz 付近が 1200Hz より十分強い");
 });
+
+// ---------------------------------------------------------------- V.21 / V.22bis / MNP
+import { V21, V21Modulator, V22bisModulator, V22BIS_POINTS, MnpFramer, AsyncFramer, makeModulator } from "../public/js/v22.js";
+
+/** V.21: ビットの中ほどでマークとスペースのどちらが強いかを比べる */
+function demodV21(samples, { mark, space }) {
+  const spb = SR / 300;
+  const bits = [];
+  const power = (f, from, to) => {
+    let i = 0, q = 0;
+    for (let n = from; n < to; n++) { i += samples[n] * Math.cos((2 * Math.PI * f * n) / SR); q += samples[n] * Math.sin((2 * Math.PI * f * n) / SR); }
+    return i * i + q * q;
+  };
+  for (let k = 0; (k + 1) * spb <= samples.length; k++) {
+    const from = Math.ceil(k * spb + spb * 0.2), to = Math.floor(k * spb + spb * 0.8);
+    bits.push(power(mark, from, to) > power(space, from, to) ? 1 : 0);
+  }
+  return bits;
+}
+
+for (const role of ["originate", "answer"]) {
+  test(`V.21 (300bps ${role}) で変調して復調すると元に戻る`, () => {
+    const text = new TextEncoder().encode("CONNECT 300 テスト\xff");
+    const m = new V21Modulator(SR, V21[role]);
+    m.push(text);
+    const s = new Float32Array(Math.ceil((text.length * 10 + 30) * (SR / 300)));
+    for (let k = 0; k < s.length; k++) s[k] = m.sample();
+    assert.equal(m.sent, text.length);
+    assert.deepEqual(unframe(demodV21(s, V21[role])), Array.from(text));
+  });
+}
+
+/** V.22bis: 同期検波で点を取り出し、象限の変化と象限内の点からビットに戻す */
+function demodV22bis(samples, carrierHz) {
+  const sps = SR / BAUD;
+  const d = new Descrambler();
+  const bits = [];
+  let prevQuad = 45;
+  for (let k = 0; (k + 1) * sps <= samples.length; k++) {
+    let i = 0, q = 0, n0 = 0;
+    for (let n = Math.ceil(k * sps + sps * 0.6); n < Math.floor(k * sps + sps * 0.95); n++, n0++) {
+      const ph = (2 * Math.PI * carrierHz * n) / SR;
+      i += samples[n] * Math.cos(ph);
+      q -= samples[n] * Math.sin(ph);
+    }
+    i = (i * 2 * 3.2) / n0; q = (q * 2 * 3.2) / n0;
+    const ang = (Math.atan2(q, i) * 180) / Math.PI;
+    const quad = ((Math.floor(ang / 90) * 90 + 45) % 360 + 360) % 360;
+    const [b1, b2] = dibitFromPhase(quad - prevQuad);
+    prevQuad = quad;
+    const rot = ((quad - 45) * Math.PI) / 180;
+    const x = i * Math.cos(-rot) - q * Math.sin(-rot), y = i * Math.sin(-rot) + q * Math.cos(-rot);
+    const key = Object.entries(V22BIS_POINTS).sort((a, b) => Math.hypot(a[1][0] - x, a[1][1] - y) - Math.hypot(b[1][0] - x, b[1][1] - y))[0][0];
+    for (const b of [b1, b2, +key[0], +key[1]]) bits.push(d.descramble(b));
+  }
+  return bits;
+}
+
+for (const hz of [ORIGINATE_HZ, ANSWER_HZ]) {
+  test(`V.22bis (2400bps, ${hz}Hz) で変調して復調すると元に戻る`, () => {
+    const text = new TextEncoder().encode("CONNECT 2400 ２４００ビーピーエス\x00\xff");
+    const m = new V22bisModulator(SR, hz);
+    m.push(text);
+    const s = new Float32Array(Math.ceil((text.length * 10 / 4 + 20) * (SR / BAUD)));
+    for (let k = 0; k < s.length; k++) s[k] = m.sample();
+    assert.equal(m.sent, text.length);
+    assert.deepEqual(unframe(demodV22bis(s, hz)), Array.from(text));
+  });
+}
+
+/** 1 秒間に送れる文字数 */
+function charsPerSecond(mod, data) {
+  mod.push(data);
+  for (let k = 0; k < SR * 2; k++) mod.sample();
+  return mod.sent / 2;
+}
+
+test("速度ごとの 1 秒あたりの文字数", () => {
+  const text = new TextEncoder().encode("パソコン通信の BBS へようこそ。掲示板・メール・チャットが使えます。\r\n".repeat(40));
+  const rates = Object.fromEntries(["300", "1200", "2400", "2400mnp"].map((sp) => [sp, charsPerSecond(makeModulator(SR, sp, "answer"), text)]));
+  assert.ok(Math.abs(rates["300"] - 30) <= 1, `300bps: ${rates["300"]}`);
+  assert.ok(Math.abs(rates["1200"] - 120) <= 1, `1200bps: ${rates["1200"]}`);
+  assert.ok(Math.abs(rates["2400"] - 240) <= 2, `2400bps: ${rates["2400"]}`);
+  assert.ok(rates["2400mnp"] > 330, `MNP5 はスタート・ストップ無し + 圧縮で速い: ${rates["2400mnp"]}`);
+});
+
+test("MNP の手順用ダミーは送信済みに数えない", () => {
+  const f = new MnpFramer(true);
+  f.push([1, 2, 3], false);
+  f.push([4, 5], true);
+  for (let i = 0; i < 400; i++) f.nextBit();
+  assert.equal(f.sent, 2);
+  assert.equal(new AsyncFramer().pending, 0);
+});

@@ -39,8 +39,14 @@
       <label id="custom-row" hidden>接続先
         <input id="custom-url" type="url" placeholder="wss://bbs.example.com/" size="32">
       </label>
+      <label>速度
+        <select id="speed"></select>
+      </label>
       <button id="dial">ダイヤル</button>
       <button id="hangup">切断</button>
+      <button id="xsend" title="XMODEM でファイルを送る (BBS 側でアップロードを始めてから)">XMODEM 送信</button>
+      <button id="xrecv" title="XMODEM でファイルを受け取る (BBS 側でダウンロードを始めてから)">XMODEM 受信</button>
+      <input id="xfile" type="file" hidden>
       <label>音量
         <input id="volume" type="range" min="0" max="100" value="50">
       </label>
@@ -67,6 +73,10 @@
       <summary>取扱説明書 / OPERATING MANUAL</summary>
       <p>POWER を押して (または端末で何かキーを押して) 電源を入れ、<code>ATDT0</code> と打つか「ダイヤル」を押すと BBS に電話をかけます。
         ダイヤルトーン、ダイヤル音、呼び出し音、応答音、ハンドシェイクの後に <code>CONNECT 1200</code> と出たら接続です。</p>
+      <p>速度は 300bps (V.21 FSK)、1200bps (V.22 DPSK)、2400bps (V.22bis 16QAM)、2400bps MNP5 から選べます。
+        MNP5 はスタート・ストップビットが無いうえにデータを圧縮するので、文章なら 2400bps より速く届きます。</p>
+      <p>XMODEM でファイルを送受信できます。BBS のファイルコーナーでアップロード (またはダウンロード) を XMODEM で始めてから、
+        「XMODEM 送信」(または「XMODEM 受信」) を押してください。転送もモデムの音の速さで行われます。Ctrl-X で中止します。</p>
       <p>送るデータと受け取るデータは、実際に V.22 方式で変調した音として鳴ります。左が送信、右が受信です (ヘッドホンだと分かりやすいです)。
         データはその音の速さ (1200bps、1 秒に約 120 文字) で届きます。</p>
       <table>
@@ -78,6 +88,7 @@
         <tr><td><code>ATM0/1/2</code></td><td>スピーカー: 消音 / 接続まで / 常に</td></tr>
         <tr><td><code>ATL0〜3</code></td><td>スピーカーの音量</td></tr>
         <tr><td><code>ATI</code></td><td>モデムの情報</td></tr>
+        <tr><td><code>AT&amp;N0〜3</code></td><td>速度: 300 / 1200 / 2400 / 2400 MNP5 (画面の「速度」と同じ)</td></tr>
         <tr><td><code>A/</code></td><td>直前のコマンドをもう一度</td></tr>
       </table>
     </details>

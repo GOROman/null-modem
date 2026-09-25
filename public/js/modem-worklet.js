@@ -2,8 +2,9 @@
 //
 // メインスレッドからの指示:
 //   { type: "tone", ch, freqs, level, on, off, am, dur }  トーン (on/off はミリ秒の断続、am は振幅変調の Hz)
-//   { type: "data", ch, carrier }                          V.22 のキャリアを出し始める (データが無ければマーク)
-//   { type: "push", ch, bytes }                            送るバイト (1200bps で音にする)
+//   { type: "data", ch, speed, role, stage }               キャリアを出し始める (データが無ければマーク)
+//   { type: "push", ch, bytes, real }                      送るバイト (real = false は手順用のダミー)
+//   { type: "line", offhook }                              回線につながっている間は回線の雑音を足す
 //   { type: "silence", ch }
 //   { type: "clunk" }                                      受話器を上げ下ろしする「ガチャ」(両チャンネル)
 //   tone に noise: true を付けるとホワイトノイズ (回線の雑音)
@@ -11,7 +12,10 @@
 //   { type: "sent", ch, n, pending }   n バイトを音にし終えた (その時点で相手に届いたことにする)
 //   { type: "toneDone", ch }           dur 付きのトーンが終わった
 
-import { V22Modulator } from "./v22.js";
+import { makeModulator } from "./v22.js";
+
+/** 速度ごとの音量 (変調方式で振幅が違うのをそろえる) */
+const DATA_LEVEL = { 300: 0.09, 1200: 0.1, 2400: 0.08, "2400mnp": 0.08 };
 
 class Voice {
   constructor(sr) {
@@ -32,16 +36,20 @@ class Voice {
     this.n = 0;
   }
 
-  data(carrier) {
+  data({ speed, role, stage }) {
+    // ハンドシェイクで方式が変わっても、送りかけのバイトは引き継ぐ
+    const carry = this.mode === "data" ? this.mod.framer.queue : [];
     this.mode = "data";
-    this.mod = new V22Modulator(this.sr, carrier);
-    this.mod.push(this.pending);
+    this.mod = makeModulator(this.sr, speed, role, stage);
+    this.level = DATA_LEVEL[speed] ?? 0.1;
+    for (const { b, real } of carry) this.mod.push([b], real);
+    this.mod.push(this.pending, true);
     this.pending = [];
   }
 
-  push(bytes) {
-    if (this.mode === "data") this.mod.push(bytes);
-    else for (const b of bytes) this.pending.push(b);
+  push(bytes, real = true) {
+    if (this.mode === "data") this.mod.push(bytes, real);
+    else if (real) for (const b of bytes) this.pending.push(b);
   }
 
   silence() {
@@ -51,7 +59,7 @@ class Voice {
 
   /** 1 サンプル。dur のトーンが終わったら "done" を返す */
   sample() {
-    if (this.mode === "data") return this.mod.sample() * 0.1;
+    if (this.mode === "data") return this.mod.sample() * this.level;
     if (this.mode !== "tone") return 0;
     const n = this.n++;
     if (this.durN && n >= this.durN) {
@@ -114,11 +122,15 @@ class ModemProcessor extends AudioWorkletProcessor {
         this.clunk.start();
         return;
       }
+      if (m.type === "line") {
+        this.offhook = m.offhook;
+        return;
+      }
       const v = this.voices[m.ch];
       if (!v) return;
       if (m.type === "tone") v.tone(m);
-      else if (m.type === "data") v.data(m.carrier);
-      else if (m.type === "push") v.push(m.bytes);
+      else if (m.type === "data") v.data(m);
+      else if (m.type === "push") v.push(m.bytes, m.real !== false);
       else if (m.type === "silence") v.silence();
     };
   }
@@ -145,7 +157,40 @@ class ModemProcessor extends AudioWorkletProcessor {
         v.mod.sent = 0;
       }
     }
+    this.phoneLine(out[0], out[1] || out[0]);
     return true;
+  }
+
+  /**
+   * 電話回線の音質にする:
+   * 送受信の回り込み、回線の雑音、軽い歪み、電話網と同じ 8kHz・8 ビット μ-law での量子化。
+   * (帯域 300Hz〜3.4kHz への制限はメインスレッドのフィルタで行う)
+   */
+  phoneLine(L, R) {
+    const hold = Math.max(1, Math.round(sampleRate / 8000));
+    const MU = 255;
+    const mulaw = (x) => {
+      x = Math.tanh(x * 1.4) / 1.4; // 軽い歪み
+      const y = (Math.sign(x) * Math.log1p(MU * Math.abs(x))) / Math.log1p(MU);
+      const q = Math.round(y * 127) / 127; // 8 ビット
+      return (Math.sign(q) * Math.expm1(Math.abs(q) * Math.log1p(MU))) / MU;
+    };
+    for (let i = 0; i < L.length; i++) {
+      let l = L[i], r = R[i];
+      if (this.offhook) {
+        // 2 線式回線での回り込み (自分の送信が少し聞こえる) と、サーッという雑音
+        const xl = l + r * 0.12, xr = r + l * 0.12;
+        l = xl + (Math.random() - 0.5) * 0.006;
+        r = xr + (Math.random() - 0.5) * 0.006;
+      }
+      // 8kHz サンプリングの再現 (hold サンプルごとに値を更新)
+      if ((this.holdN = ((this.holdN ?? 0) + 1) % hold) === 0 || this.holdL === undefined) {
+        this.holdL = mulaw(l);
+        this.holdR = mulaw(r);
+      }
+      L[i] = this.holdL;
+      if (R !== L) R[i] = this.holdR;
+    }
   }
 }
 

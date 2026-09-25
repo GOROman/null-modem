@@ -5,7 +5,8 @@
 // 接続後は送受信のバイトを V.22 で変調した音にしながら (L = 送信 / R = 受信)、
 // その速さ (1200bps) で WebSocket 経由の BBS とやりとりする。
 
-import { ORIGINATE_HZ, ANSWER_HZ } from "./v22.js";
+import { SPEEDS } from "./v22.js";
+import { XmodemSender, XmodemReceiver } from "./xmodem.js";
 
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -75,6 +76,10 @@ async function loadConfig() {
   } catch {
     /* ローカルで静的に開いたときは電話帳なし */
   }
+  const sp = $("speed");
+  sp.innerHTML = "";
+  for (const [k, v] of Object.entries(SPEEDS)) sp.add(new Option(v.label, k));
+  sp.value = settings.speed && SPEEDS[settings.speed] ? settings.speed : "1200";
   const sel = $("phonebook");
   sel.innerHTML = "";
   for (const e of phonebook) sel.add(new Option(`${e.name} (${e.number})`, e.number));
@@ -167,7 +172,11 @@ const modem = {
   plus: 0,
   plusTimer: null,
   remoteClosed: false,
+  speed: "1200", // 接続中の速度
+  xfer: null, // XMODEM 転送中 { t, dir, name }
 };
+
+const speedSel = () => $("speed").value;
 
 function led(name, on) {
   const el = document.querySelector(`.led[data-led="${name}"]`);
@@ -207,14 +216,15 @@ function onWorklet(m) {
   }
   if (m.type !== "sent") return;
   if (m.ch === "L") {
-    // 送信: 音にし終えたバイトを BBS へ
+    // 送信: 音にし終えたバイトを BBS へ (XMODEM の転送中も同じ経路)
     const bytes = modem.txQueue.splice(0, m.n);
     if (modem.ws && modem.ws.readyState === WebSocket.OPEN) modem.ws.send(new Uint8Array(bytes));
     blink("SD");
   } else {
     // 受信: 音にし終えたバイトを画面へ
     const bytes = modem.rxQueue.splice(0, m.n);
-    if (modem.state === "online") writeBytes(new Uint8Array(bytes));
+    if (modem.xfer) xferInput(bytes);
+    else if (modem.state === "online") writeBytes(new Uint8Array(bytes));
     else modem.rxBefore.push(...bytes); // +++ で抜けている間はためておく
     blink("RD");
     if (m.pending === 0 && modem.remoteClosed) carrierLost();
@@ -267,6 +277,9 @@ async function dial(number) {
   setState("dialing");
   led("OH", true);
   clunk(); // 受話器を上げる
+  post({ type: "line", offhook: true });
+  const speed = speedSel();
+  modem.speed = speed;
   const check = () => {
     if (abort.signal.aborted) throw new Error("abort");
   };
@@ -322,16 +335,12 @@ async function dial(number) {
     await sleep(300);
     await playTone("R", { freqs: [2100], level: 0.1, dur: 2600 });
     check();
-    // ハンドシェイク: 応答側 (2400Hz) のキャリア → 発信側 (1200Hz) のキャリア
     await sleep(75);
-    post({ type: "data", ch: "R", carrier: ANSWER_HZ });
-    await sleep(500);
-    post({ type: "data", ch: "L", carrier: ORIGINATE_HZ });
-    await sleep(765);
+    await handshake(speed);
     check();
     led("CD", true);
-    led("HS", true);
-    say("\nCONNECT 1200\n");
+    led("HS", speed !== "300");
+    say(`\n${SPEEDS[speed].connect}\n`);
     setState("online");
     if (modem.rxHold.length) receive(new Uint8Array(modem.rxHold.splice(0)));
   } catch (e) {
@@ -362,6 +371,37 @@ async function garble() {
 }
 
 let losing = false;
+/** 速度ごとのハンドシェイクの音 */
+async function handshake(speed) {
+  const data = (ch, stage = "data") => post({ type: "data", ch, speed, role: ch === "L" ? "originate" : "answer", stage });
+  if (speed === "300") {
+    // V.21: 応答側のマーク (1650Hz) → 発信側のマーク (980Hz)
+    data("R");
+    await sleep(500);
+    data("L");
+    await sleep(600);
+    return;
+  }
+  // V.22: 応答側 (2400Hz) → 発信側 (1200Hz)
+  data("R", "v22");
+  await sleep(500);
+  data("L", "v22");
+  await sleep(speed === "1200" ? 765 : 450);
+  if (speed === "1200") return;
+  // V.22bis: 16 点の信号に切り替える
+  data("R");
+  data("L");
+  await sleep(600);
+  if (speed === "2400mnp") {
+    // MNP のリンク確立 (LR / LA フレームのやりとり)
+    const frame = () => Array.from({ length: 20 }, () => Math.floor(Math.random() * 256));
+    post({ type: "push", ch: "L", bytes: frame(), real: false });
+    await sleep(250);
+    post({ type: "push", ch: "R", bytes: frame(), real: false });
+    await sleep(350);
+  }
+}
+
 async function carrierLost() {
   if (modem.state === "command" || losing) return;
   losing = true;
@@ -384,8 +424,10 @@ function hangup(ok) {
     modem.ws.close();
     modem.ws = null;
   }
+  if (modem.xfer) endXfer("回線が切れたので中止しました");
   silence("L");
   silence("R");
+  post({ type: "line", offhook: false });
   if (modem.state !== "command") clunk(); // 受話器を置く
   for (const l of ["OH", "CD", "HS", "RD", "SD"]) led(l, false);
   $("dest").textContent = "-";
@@ -396,7 +438,7 @@ function hangup(ok) {
 // ------------------------------------------------------------------ AT コマンド
 
 function info() {
-  return "NULL-MODEM 1200\nITU-T V.22 1200bps / DPSK 600baud / L:1200Hz R:2400Hz\n";
+  return `NULL-MODEM\n300bps V.21 / 1200bps V.22 / 2400bps V.22bis / MNP5\n速度: ${SPEEDS[speedSel()].label}\n`;
 }
 
 function execute(line) {
@@ -471,10 +513,21 @@ function execute(line) {
       case "B":
         num();
         break;
-      case "&":
-        i++;
-        num();
+      case "&": {
+        const c2 = s[i++];
+        const n = num();
+        if (c2 === "N") {
+          const k = ["300", "1200", "2400", "2400mnp"][n];
+          if (!k) {
+            say("ERROR\n");
+            return;
+          }
+          $("speed").value = k;
+          settings.speed = k;
+          saveSettings();
+        }
         break;
+      }
       case "S":
         num();
         if (s[i] === "=") {
@@ -501,7 +554,92 @@ function sendByte(bytes) {
   post({ type: "push", ch: "L", bytes });
 }
 
+// ------------------------------------------------------------------ XMODEM
+
+function human(n) {
+  return n >= 1024 ? `${(n / 1024).toFixed(1)}KB` : `${n}B`;
+}
+
+function xferStatus() {
+  const x = modem.xfer;
+  if (!x) return;
+  const p = x.t.progress;
+  const total = p.total != null ? ` / ${human(p.total)}` : "";
+  $("status").textContent = `XMODEM ${x.dir} ${x.name} ${human(p.bytes)}${total} 再送 ${p.errors}`;
+}
+
+/** XMODEM の相手に送るバイト (送信側の音 L を通る) */
+function xferSend(bytes) {
+  if (bytes.length) sendByte(Uint8Array.from(bytes));
+}
+
+function xferInput(bytes) {
+  const x = modem.xfer;
+  xferSend(x.t.input(bytes));
+  xferStatus();
+  if (!x.t.running) endXfer();
+}
+
+function endXfer(reason) {
+  const x = modem.xfer;
+  if (!x) return;
+  modem.xfer = null;
+  clearInterval(x.timer);
+  if (reason && x.t.running) xferSend(x.t.cancel());
+  const ok = x.t.state === "done";
+  window.nullModem.lastXfer = x;
+  say(`\n[XMODEM] ${reason || x.t.message}\n`);
+  if (ok && x.dir === "受信") {
+    const data = x.t.result();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([data]));
+    a.download = x.name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    say(`[XMODEM] ${x.name} (${data.length} バイト) を保存しました\n`);
+  }
+  setState(modem.state);
+}
+
+function startXfer(t, dir, name, first = []) {
+  modem.xfer = { t, dir, name, timer: setInterval(() => {
+    const x = modem.xfer;
+    if (!x) return;
+    xferSend(x.t.tick(Date.now()));
+    xferStatus();
+    if (!x.t.running) endXfer();
+  }, 100) };
+  say(`\n[XMODEM] ${dir}を始めます (${name})。中止は Ctrl-X\n`);
+  xferSend(first);
+  xferStatus();
+}
+
+$("xsend").onclick = () => {
+  if (modem.state !== "online" || modem.xfer) return say("\n[XMODEM] 接続中に使えます\n");
+  $("xfile").value = "";
+  $("xfile").click();
+};
+$("xfile").onchange = async () => {
+  const f = $("xfile").files[0];
+  if (!f) return;
+  const data = new Uint8Array(await f.arrayBuffer());
+  startXfer(new XmodemSender(data), "送信", f.name);
+  term.focus();
+};
+$("xrecv").onclick = () => {
+  if (modem.state !== "online" || modem.xfer) return say("\n[XMODEM] 接続中に使えます\n");
+  const name = (settings.lastRecv || "download.bin").replace(/[\\/]/g, "_");
+  const t = new XmodemReceiver();
+  startXfer(t, "受信", name, t.start());
+  term.focus();
+};
+
 function onlineInput(data) {
+  if (modem.xfer) {
+    // 転送中は Ctrl-X か Esc で中止。ほかのキーは送らない
+    if (data === "\x18" || data === "\x1b") endXfer("中止しました");
+    return;
+  }
   const now = performance.now();
   // +++ (前後に 1 秒の無入力) でコマンドモードへ
   if (data === "+" && (modem.plus > 0 || now - modem.lastKey > 1000)) {
@@ -632,6 +770,10 @@ $("hangup").onclick = () => {
   term.focus();
 };
 $("volume").oninput = updateVolume;
+$("speed").onchange = () => {
+  settings.speed = $("speed").value;
+  saveSettings();
+};
 $("phonebook").onchange = () => {
   $("custom-row").hidden = $("phonebook").value !== "*";
 };
@@ -645,4 +787,4 @@ say("POWER スイッチを入れてください (何かキーを押しても入�
 term.focus();
 
 // デバッグ用 (ブラウザの開発ツールから状態を見られるように)
-window.nullModem = { term, modem };
+window.nullModem = { term, modem, startXfer, XmodemSender, XmodemReceiver };
