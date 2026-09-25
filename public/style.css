@@ -1,97 +1,320 @@
+/* NULL-MODEM — 90 年代の外付けモデムとブラウン管の端末 */
+
 :root {
-  --bg: #1b1d22;
-  --panel: #d8d2c4;
-  --panel-dark: #b9b2a2;
-  --ink: #2a2a2a;
-  --led-off: #3a2a2a;
-  --led-on: #ff3b30;
-  --led-green: #4cd964;
-  --text: #e8e8e8;
+  --desk: #121416;
+  --plastic: #1c1d20;
+  --plastic-hi: #2c2e33;
+  --plastic-lo: #0e0f11;
+  --bezel: #cfc6b3;
+  --bezel-lo: #a79d88;
+  --phosphor: #7cff8a;
+  --phosphor-dim: #2e8c3a;
+  --amber: #ffb000;
+  --led-red: #ff2d1f;
+  --led-green: #39ff5a;
+  --label: #c9c9c9;
+  --pixel: "DotGothic16", "VT323", "Osaka-Mono", monospace;
+  --mono: "VT323", "DotGothic16", monospace;
 }
 
 * { box-sizing: border-box; }
 
+html, body { height: 100%; }
+
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  color: var(--label);
+  font-family: var(--pixel);
+  background:
+    radial-gradient(1200px 600px at 50% -10%, rgba(80, 90, 120, 0.25), transparent 70%),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.015) 0 1px, transparent 1px 3px),
+    var(--desk);
 }
 
 main {
-  max-width: 980px;
+  max-width: 1000px;
   margin: 0 auto;
-  padding: 16px;
+  padding: 20px 16px 40px;
 }
 
-/* モデム本体の前面パネル */
+/* ------------------------------------------------------------ モデム本体 */
+
 .modem {
-  display: flex;
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 24px;
-  padding: 14px 20px;
-  background: linear-gradient(var(--panel), var(--panel-dark));
-  color: var(--ink);
-  border-radius: 6px 6px 2px 2px;
-  box-shadow: 0 6px 0 #8f887a, 0 10px 24px rgba(0, 0, 0, 0.5);
-  margin-bottom: 18px;
-  flex-wrap: wrap;
+  gap: 28px;
+  padding: 18px 26px 16px;
+  border-radius: 14px 14px 6px 6px;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 2px, transparent 2px 6px),
+    linear-gradient(180deg, var(--plastic-hi), var(--plastic) 40%, var(--plastic-lo));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.6),
+    0 14px 0 -6px #070708,
+    0 24px 40px rgba(0, 0, 0, 0.7);
+  margin-bottom: 26px;
 }
-.brand { display: flex; flex-direction: column; line-height: 1.1; }
-.logo { font-weight: 800; letter-spacing: 0.12em; font-size: 20px; }
-.model { font-size: 12px; letter-spacing: 0.2em; opacity: 0.7; }
 
-.leds { display: flex; gap: 14px; flex: 1; flex-wrap: wrap; }
-.led { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; }
-.led i {
-  width: 12px; height: 12px; border-radius: 50%;
-  background: var(--led-off);
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6);
+/* 筐体の上のスリット */
+.modem::before {
+  content: "";
+  position: absolute;
+  left: 30%; right: 30%; top: 7px; height: 4px;
+  border-radius: 2px;
+  background: repeating-linear-gradient(90deg, #050505 0 10px, transparent 10px 14px);
+  opacity: 0.8;
 }
-.led.on i { background: var(--led-on); box-shadow: 0 0 8px var(--led-on); }
-.led[data-led="MR"].on i, .led[data-led="TR"].on i { background: var(--led-green); box-shadow: 0 0 8px var(--led-green); }
+
+.brand { display: flex; flex-direction: column; gap: 2px; }
+.logo {
+  font-family: "Arial Black", "Helvetica Neue", sans-serif;
+  font-style: italic;
+  font-weight: 900;
+  font-size: 26px;
+  letter-spacing: 0.04em;
+  color: #eee;
+  text-shadow: 0 1px 0 #000;
+}
+.logo em {
+  font-style: italic;
+  color: var(--led-red);
+}
+.stripe {
+  height: 4px;
+  width: 150px;
+  background: linear-gradient(90deg, var(--led-red), #ff8a00 50%, transparent);
+  transform: skewX(-20deg);
+}
+.model {
+  font-family: var(--mono);
+  font-size: 16px;
+  letter-spacing: 0.25em;
+  color: #9a9a9a;
+}
+
+.leds {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  padding: 10px 18px;
+  border-radius: 6px;
+  background: linear-gradient(#0b0b0c, #151518);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.led {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 15px;
+  letter-spacing: 0.1em;
+  color: #8d8d8d;
+}
+.led i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #5a2320, #2a0d0c 70%);
+  box-shadow: 0 0 0 1px #000;
+  transition: background 0.06s, box-shadow 0.06s;
+}
+.led.on i {
+  background: radial-gradient(circle at 35% 30%, #ffd0c8, var(--led-red) 45%, #8a0d05 90%);
+  box-shadow: 0 0 0 1px #000, 0 0 10px 2px rgba(255, 45, 31, 0.8);
+}
+.led.on span { color: #e6e6e6; }
+.led[data-led="MR"].on i, .led[data-led="TR"].on i {
+  background: radial-gradient(circle at 35% 30%, #e0ffe4, var(--led-green) 45%, #0b6d1d 90%);
+  box-shadow: 0 0 0 1px #000, 0 0 10px 2px rgba(57, 255, 90, 0.7);
+}
 
 .power {
-  font-weight: 800; letter-spacing: 0.1em;
-  padding: 10px 16px; border-radius: 4px; border: 2px solid #555;
-  background: #444; color: #ddd; cursor: pointer;
+  font-family: var(--mono);
+  font-size: 18px;
+  letter-spacing: 0.2em;
+  color: #bbb;
+  padding: 12px 18px 10px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(#3a3c41, #232428);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 4px 0 #0a0a0b, 0 6px 10px rgba(0, 0, 0, 0.6);
+  transition: transform 0.05s, box-shadow 0.05s;
 }
-.power.on { background: #2d5e36; border-color: #4cd964; color: #fff; }
+.power:active { transform: translateY(3px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 1px 0 #0a0a0b; }
+.power.on { color: var(--led-green); text-shadow: 0 0 8px rgba(57, 255, 90, 0.8); }
+
+/* ------------------------------------------------------------ 操作パネル */
 
 .controls {
-  display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
-  margin-bottom: 12px; font-size: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  margin: 0 4px 18px;
+  font-size: 15px;
 }
-.controls label { display: flex; gap: 6px; align-items: center; }
+.controls label { display: flex; align-items: center; gap: 8px; color: #aaa; }
 .controls select, .controls input[type="url"] {
-  background: #2a2d34; color: var(--text); border: 1px solid #555; border-radius: 4px; padding: 4px 6px;
+  font-family: var(--pixel);
+  font-size: 14px;
+  color: var(--phosphor);
+  background: #07110a;
+  border: 1px solid #2d3a2f;
+  border-radius: 3px;
+  padding: 5px 8px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8);
 }
 .controls button {
-  background: #3a3f48; color: var(--text); border: 1px solid #666; border-radius: 4px;
-  padding: 6px 14px; cursor: pointer;
+  font-family: var(--pixel);
+  font-size: 15px;
+  color: #ddd;
+  padding: 7px 18px 6px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background: linear-gradient(#45474d, #2a2b30);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 3px 0 #0b0b0c;
 }
-.controls button:hover { background: #4a505b; }
-.status { margin-left: auto; opacity: 0.85; }
+.controls button:active { transform: translateY(2px); box-shadow: 0 1px 0 #0b0b0c; }
+#dial { background: linear-gradient(#2f6b3a, #1b4424); color: #d8ffd8; }
+#hangup { background: linear-gradient(#7a2a24, #4b1612); color: #ffd8d4; }
+.controls input[type="range"] { accent-color: var(--amber); }
+.status {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 18px;
+  color: #888;
+}
+.status b { color: var(--amber); font-weight: normal; text-shadow: 0 0 6px rgba(255, 176, 0, 0.5); }
 
-#terminal {
-  padding: 10px;
-  background: #0b1a10;
+/* ------------------------------------------------------------ ブラウン管 */
+
+.crt {
+  position: relative;
+  padding: 26px 30px 34px;
+  border-radius: 22px;
+  background: linear-gradient(160deg, #ddd5c3, var(--bezel) 40%, var(--bezel-lo));
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -4px 8px rgba(0, 0, 0, 0.25),
+    0 20px 40px rgba(0, 0, 0, 0.6);
+}
+.crt .plate {
+  position: absolute;
+  bottom: 8px;
+  left: 34px;
+  font-family: var(--mono);
+  font-size: 15px;
+  letter-spacing: 0.3em;
+  color: #6f6655;
+}
+.crt .plate::after {
+  content: "";
+  display: inline-block;
+  width: 8px; height: 8px; margin-left: 12px;
+  border-radius: 50%;
+  background: #3fe060;
+  box-shadow: 0 0 6px #3fe060;
+  vertical-align: middle;
+}
+.screen {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px / 14px;
+  background: radial-gradient(ellipse at center, #0c1f11 0%, #06110a 70%, #020604 100%);
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.9), inset 0 0 6px rgba(0, 0, 0, 0.9), 0 0 0 3px #1c1a15;
+  padding: 18px 16px;
+}
+/* 走査線と周辺減光 */
+.screen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.28) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
+  animation: flicker 0.12s infinite alternate;
+}
+@keyframes flicker {
+  from { opacity: 0.92; }
+  to { opacity: 1; }
+}
+#terminal .xterm-rows {
+  text-shadow: 0 0 2px rgba(124, 255, 138, 0.9), 0 0 8px rgba(124, 255, 138, 0.35);
+}
+#terminal .xterm-viewport { background: transparent !important; }
+#terminal .xterm-screen { filter: saturate(1.1); }
+
+/* ------------------------------------------------------------ オシロスコープ */
+
+.scopes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-top: 24px;
+}
+.scopes figure {
+  margin: 0;
+  padding: 10px 10px 8px;
   border-radius: 8px;
-  border: 10px solid #2b2b2b;
-  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.8);
+  background: linear-gradient(var(--plastic-hi), var(--plastic-lo));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 8px 18px rgba(0, 0, 0, 0.5);
 }
+.scopes canvas {
+  display: block;
+  width: 100%;
+  height: 100px;
+  border-radius: 4px;
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.9);
+}
+.scopes figcaption {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-family: var(--mono);
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  color: #9b9b9b;
+}
+.scopes figcaption b { font-weight: normal; }
+.scopes .tx b { color: var(--amber); }
+.scopes .rx b { color: var(--phosphor); }
 
-.scopes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
-.scopes figure { margin: 0; }
-.scopes canvas { width: 100%; height: 90px; border-radius: 4px; border: 1px solid #333; display: block; }
-.scopes figcaption { font-size: 12px; opacity: 0.7; margin-top: 4px; }
+/* ------------------------------------------------------------ 取扱説明書 */
 
-.help { margin-top: 16px; font-size: 14px; line-height: 1.7; opacity: 0.9; }
-.help table { border-collapse: collapse; }
-.help td, .help th { border: 1px solid #444; padding: 3px 10px; text-align: left; }
-code { background: #2a2d34; padding: 1px 5px; border-radius: 3px; }
+.help {
+  margin-top: 26px;
+  padding: 14px 20px;
+  border-radius: 6px;
+  background: #e9e2d0;
+  color: #2b2720;
+  font-size: 14px;
+  line-height: 1.8;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+}
+.help summary {
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 18px;
+  letter-spacing: 0.15em;
+}
+.help table { border-collapse: collapse; margin: 8px 0; }
+.help td, .help th { border: 1px solid #b9ae95; padding: 3px 12px; text-align: left; }
+.help th { background: #d8cfb9; }
+.help code { background: #d8cfb9; padding: 0 5px; border-radius: 2px; font-family: var(--pixel); }
 
-@media (max-width: 700px) {
+@media (max-width: 760px) {
+  .modem { grid-template-columns: 1fr; justify-items: center; }
+  .leds { flex-wrap: wrap; }
   .scopes { grid-template-columns: 1fr; }
   .status { margin-left: 0; }
+  .crt { padding: 14px 12px 30px; }
 }
+
+[hidden] { display: none !important; }

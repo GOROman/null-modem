@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>NULL-MODEM 1200</title>
   <meta name="description" content="ブラウザで動く 1200bps (V.22) ソフトウェアモデム。音を鳴らしながらパソコン通信の BBS につなぎます">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=VT323&display=swap">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
@@ -13,8 +16,9 @@
   <main>
     <section class="modem" aria-label="モデム本体">
       <div class="brand">
-        <span class="logo">NULL-MODEM</span>
-        <span class="model">1200 / V.22</span>
+        <span class="logo">NULL<em>-</em>MODEM</span>
+        <span class="stripe"></span>
+        <span class="model">1200 · V.22 · FULL DUPLEX</span>
       </div>
       <div class="leds" aria-label="状態ランプ">
         <div class="led" data-led="HS"><i></i><span>HS</span></div>
@@ -43,21 +47,24 @@
       <span class="status"><b id="status">コマンドモード</b> / 接続先: <b id="dest">-</b></span>
     </section>
 
-    <div id="terminal"></div>
+    <div class="crt">
+      <div class="screen"><div id="terminal"></div></div>
+      <span class="plate">NULL-TERM 25</span>
+    </div>
 
     <section class="scopes" aria-label="波形">
       <figure>
-        <canvas id="scope-L" width="480" height="90"></canvas>
-        <figcaption>送信 (L) 発信側キャリア 1200Hz</figcaption>
+        <canvas id="scope-L" width="960" height="200"></canvas>
+        <figcaption class="tx"><b>CH-L 送信 TX</b><span>1200Hz ORIGINATE</span></figcaption>
       </figure>
       <figure>
-        <canvas id="scope-R" width="480" height="90"></canvas>
-        <figcaption>受信 (R) 応答側キャリア 2400Hz</figcaption>
+        <canvas id="scope-R" width="960" height="200"></canvas>
+        <figcaption class="rx"><b>CH-R 受信 RX</b><span>2400Hz ANSWER</span></figcaption>
       </figure>
     </section>
 
     <details class="help">
-      <summary>使い方</summary>
+      <summary>取扱説明書 / OPERATING MANUAL</summary>
       <p>POWER を押して (または端末で何かキーを押して) 電源を入れ、<code>ATDT0</code> と打つか「ダイヤル」を押すと BBS に電話をかけます。
         ダイヤルトーン、ダイヤル音、呼び出し音、応答音、ハンドシェイクの後に <code>CONNECT 1200</code> と出たら接続です。</p>
       <p>送るデータと受け取るデータは、実際に V.22 方式で変調した音として鳴ります。左が送信、右が受信です (ヘッドホンだと分かりやすいです)。

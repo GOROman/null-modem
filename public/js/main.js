@@ -15,12 +15,29 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const term = new Terminal({
   cols: 80,
   rows: 25,
-  fontFamily: '"Cascadia Mono", "Osaka-Mono", "MS Gothic", monospace',
-  fontSize: 15,
+  fontFamily: '"DotGothic16", "VT323", "Osaka-Mono", monospace',
+  fontSize: 16,
   cursorBlink: true,
-  theme: { background: "#0b1a10", foreground: "#8ff0a4", cursor: "#8ff0a4" },
+  cursorStyle: "block",
+  allowTransparency: true,
+  theme: {
+    background: "rgba(0,0,0,0)",
+    foreground: "#7cff8a",
+    cursor: "#7cff8a",
+    cursorAccent: "#06110a",
+    selectionBackground: "rgba(124,255,138,0.3)",
+    green: "#7cff8a",
+    brightGreen: "#b6ffbf",
+    yellow: "#ffb000",
+    brightYellow: "#ffd466",
+  },
 });
 term.open($("terminal"));
+// ドット文字のフォントが読み込まれたら、文字の幅を測り直す
+document.fonts.load('16px "DotGothic16"').then(() => {
+  term.options.fontFamily = term.options.fontFamily;
+  term.refresh(0, term.rows - 1);
+});
 const enc = new TextEncoder();
 // 受信は 1 バイトずつ届くので、UTF-8 は自前で組み立ててから文字列で書く
 // (xterm.js にバイトのまま細切れで渡すと、0x80 の続きバイトを取りこぼすことがある)
@@ -510,11 +527,29 @@ function drawScopes() {
       const cv = $(`scope-${ch}`);
       const g = cv.getContext("2d");
       const a = analysers[ch];
-      g.fillStyle = "#081208";
+      const color = ch === "L" ? "255,176,0" : "124,255,138";
+      // 残光のように前の波形を少し残す
+      g.fillStyle = "rgba(4,10,6,0.55)";
       g.fillRect(0, 0, cv.width, cv.height);
+      // 目盛り
+      g.strokeStyle = "rgba(120,160,130,0.12)";
+      g.lineWidth = 1;
+      g.beginPath();
+      for (let x = 0; x <= 10; x++) {
+        g.moveTo((x * cv.width) / 10, 0);
+        g.lineTo((x * cv.width) / 10, cv.height);
+      }
+      for (let y = 0; y <= 4; y++) {
+        g.moveTo(0, (y * cv.height) / 4);
+        g.lineTo(cv.width, (y * cv.height) / 4);
+      }
+      g.stroke();
       if (!a) continue;
       a.getFloatTimeDomainData(buf);
-      g.strokeStyle = ch === "L" ? "#ffcc55" : "#55ddff";
+      g.strokeStyle = `rgba(${color},0.95)`;
+      g.lineWidth = 2.5;
+      g.shadowColor = `rgba(${color},0.9)`;
+      g.shadowBlur = 10;
       g.beginPath();
       const n = 600;
       for (let x = 0; x < n; x++) {
@@ -523,6 +558,7 @@ function drawScopes() {
         x ? g.lineTo(px, y) : g.moveTo(px, y);
       }
       g.stroke();
+      g.shadowBlur = 0;
     }
     requestAnimationFrame(frame);
   };
