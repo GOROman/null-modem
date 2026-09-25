@@ -15,7 +15,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const term = new Terminal({
   cols: 80,
   rows: 25,
-  fontFamily: '"DotGothic16", "VT323", "Osaka-Mono", monospace',
+  // 端末は半角が全角のちょうど半分になる等幅フォントにする (ドット文字の DotGothic16 は
+  // 半角が等幅でないので、xterm.js で文字が重なる)
+  fontFamily: '"BIZ UDGothic", "Osaka-Mono", monospace',
   fontSize: 16,
   cursorBlink: true,
   cursorStyle: "block",
@@ -32,12 +34,22 @@ const term = new Terminal({
     brightYellow: "#ffd466",
   },
 });
+// ドット文字のフォントが読み込まれてから端末を開く (先に開くと文字幅を測り違える)。
+// フォントの CSS 自体がまだ届いていないこともあるので、先にそれを待つ
+async function waitFonts() {
+  const css = $("fonts-css");
+  if (css && !css.sheet) await new Promise((r) => css.addEventListener("load", r, { once: true }));
+  await document.fonts.load('16px "BIZ UDGothic"');
+}
+await Promise.race([waitFonts(), sleep(3000)]);
 term.open($("terminal"));
-// ドット文字のフォントが読み込まれたら、文字の幅を測り直す
-document.fonts.load('16px "DotGothic16"').then(() => {
-  term.options.fontFamily = term.options.fontFamily;
-  term.refresh(0, term.rows - 1);
-});
+// それでも後から読み込まれたときは、文字幅を測り直させる
+const remeasure = () => {
+  const family = term.options.fontFamily;
+  term.options.fontFamily = "monospace";
+  term.options.fontFamily = family;
+};
+document.fonts.addEventListener("loadingdone", remeasure);
 const enc = new TextEncoder();
 // 受信は 1 バイトずつ届くので、UTF-8 は自前で組み立ててから文字列で書く
 // (xterm.js にバイトのまま細切れで渡すと、0x80 の続きバイトを取りこぼすことがある)

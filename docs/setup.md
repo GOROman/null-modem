@@ -36,6 +36,21 @@ cloudflared tunnel run null-bbs
 
 これで `wss://bbs.example.com/` が null-bbs の WebSocket 回線につながります。null-bbs の管理コンソールには、接続元として利用者の IP アドレスが出ます。
 
+### すぐ試すとき (クイックトンネル)
+
+Cloudflare アカウントやドメインが無くても、一時的な URL で公開できます。起動するたびに URL が変わり、cloudflared を止めると使えなくなります。
+
+```sh
+cloudflared tunnel --url http://localhost:5657
+# → https://xxxx-xxxx.trycloudflare.com が表示される (wss://xxxx-xxxx.trycloudflare.com/ で使う)
+```
+
+URL は `wrangler.jsonc` に書かずに、デプロイのときに渡すこともできます。
+
+```sh
+npx wrangler deploy --var 'PHONEBOOK:[{"number":"0","name":"NULL-BBS","url":"wss://xxxx-xxxx.trycloudflare.com/"}]'
+```
+
 ## 3. null-modem を Cloudflare Workers にデプロイする
 
 `wrangler.jsonc` の電話帳 (`PHONEBOOK`) の接続先を、手順 2 のホスト名に書き換えます。
