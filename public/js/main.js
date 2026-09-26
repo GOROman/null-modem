@@ -90,10 +90,10 @@ async function loadConfig() {
 
 /** 電話番号から接続先 URL を決める */
 function resolve(number) {
-  const e = phonebook.find((p) => p.number === number);
+  const dialed = number.replace(/\D/g, "");
+  const e = phonebook.find((p) => p.number.replace(/\D/g, "") === dialed);
   if (e) return { url: e.url, name: e.name };
   if (settings.url) return { url: settings.url, name: settings.url };
-  if (phonebook.length === 1) return { url: phonebook[0].url, name: phonebook[0].name };
   return null;
 }
 

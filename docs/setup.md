@@ -48,7 +48,7 @@ cloudflared tunnel --url http://localhost:5657
 URL は `wrangler.jsonc` に書かずに、デプロイのときに渡すこともできます。
 
 ```sh
-npx wrangler deploy --var 'PHONEBOOK:[{"number":"0","name":"NULL-BBS","url":"wss://xxxx-xxxx.trycloudflare.com/"}]'
+npx wrangler deploy --var 'PHONEBOOK:[{"number":"03-1919-0721","name":"NULL-BBS","url":"wss://xxxx-xxxx.trycloudflare.com/"}]'
 ```
 
 ## 3. null-modem を Cloudflare Workers にデプロイする
@@ -57,7 +57,7 @@ npx wrangler deploy --var 'PHONEBOOK:[{"number":"0","name":"NULL-BBS","url":"wss
 
 ```jsonc
 "vars": {
-  "PHONEBOOK": "[{\"number\":\"0\",\"name\":\"NULL-BBS\",\"url\":\"wss://bbs.example.com/\"}]"
+  "PHONEBOOK": "[{\"number\":\"03-1919-0721\",\"name\":\"NULL-BBS\",\"url\":\"wss://bbs.example.com/\"}]"
 }
 ```
 
@@ -66,6 +66,6 @@ npx wrangler login    # 初回のみ
 npx wrangler deploy
 ```
 
-表示された `https://null-modem.<あなたのサブドメイン>.workers.dev/` を開き、POWER を押してから「ダイヤル」(または `ATDT0`) で接続します。
+表示された `https://null-modem.<あなたのサブドメイン>.workers.dev/` を開き、POWER を押してから「ダイヤル」(または `ATDT0319190721`) で接続します。
 
 電話帳は複数書けます。番号ごとに別の BBS を割り当てられます。電話帳に無い番号にかけたときは、画面の「手入力の接続先」に入れた URL につなぎます。
