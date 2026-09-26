@@ -9,6 +9,6 @@
   },
   "vars": {
     // 電話帳: 番号 → 接続先 (Cloudflare Tunnel で公開した null-bbs の WebSocket)
-    "PHONEBOOK": "[{\"number\":\"03-1919-0721\",\"name\":\"NULL-BBS\",\"url\":\"wss://bbs.example.com/\"}]"
+    "PHONEBOOK": "[{\"number\":\"03-1919-0721\",\"name\":\"NULL-BBS\",\"url\":\"wss://bbs.example.com/\"},{\"number\":\"03-4545-1919\",\"name\":\"NULL-NET\",\"url\":\"wss://net.example.com/\"}]"
   }
 }
