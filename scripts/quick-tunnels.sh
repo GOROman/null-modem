@@ -19,8 +19,11 @@ start() { # $1 = 番号
   PIDS[$1]=$!
   local url=""
   for _ in $(seq 1 60); do
-    url=$(grep -o "https://[a-z0-9-]*\.trycloudflare\.com" "$log" | head -1)
-    [ -n "$url" ] && break
+    # -a: cloudflared のログに制御文字が混じると grep が「バイナリファイル」
+    # と誤認し、-o が効かず "Binary file ... matches" を返すことがあるため
+    url=$(grep -a -o "https://[a-z0-9-]*\.trycloudflare\.com" "$log" | head -1)
+    [[ "$url" =~ ^https://[a-z0-9-]+\.trycloudflare\.com$ ]] && break
+    url=""
     sleep 1
   done
   HOSTS[$1]=${url#https://}
@@ -29,6 +32,12 @@ start() { # $1 = 番号
 
 deploy() {
   local json="[" i
+  for i in "${!ENTRIES[@]}"; do
+    if [[ ! "${HOSTS[$i]:-}" =~ ^[a-z0-9-]+\.trycloudflare\.com$ ]]; then
+      echo "$(date '+%m/%d %H:%M:%S') ${ENTRIES[$i]}: URL がおかしいので電話帳の更新をやめます (${HOSTS[$i]:-空})"
+      return 1
+    fi
+  done
   for i in "${!ENTRIES[@]}"; do
     IFS='|' read -r num name _ <<<"${ENTRIES[$i]}"
     [ "$i" -gt 0 ] && json+=","
