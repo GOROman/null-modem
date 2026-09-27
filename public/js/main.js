@@ -88,6 +88,23 @@ async function loadConfig() {
   $("custom-row").hidden = phonebook.length > 0 && sel.value !== "*";
 }
 
+/** ダイヤルのたびに電話帳を読み直す (接続先の URL が変わることがあるため)。選んでいる項目はそのまま */
+async function refreshPhonebook() {
+  try {
+    const r = await fetch("config.json", { cache: "no-store" });
+    if (!r.ok) return;
+    phonebook = (await r.json()).phonebook || [];
+    const sel = $("phonebook");
+    const cur = sel.value;
+    sel.innerHTML = "";
+    for (const e of phonebook) sel.add(new Option(`${e.name} (${e.number})`, e.number));
+    sel.add(new Option("手入力の接続先", "*"));
+    if ([...sel.options].some((o) => o.value === cur)) sel.value = cur;
+  } catch {
+    /* 読めなければ前の電話帳のまま */
+  }
+}
+
 /** 電話番号から接続先 URL を決める */
 function resolve(number) {
   const dialed = number.replace(/\D/g, "");
@@ -265,6 +282,7 @@ function openSocket(url, signal) {
 
 async function dial(number) {
   if (!ctx) await powerOn();
+  await refreshPhonebook();
   const dest = resolve(number);
   const abort = new AbortController();
   modem.abort = abort;
